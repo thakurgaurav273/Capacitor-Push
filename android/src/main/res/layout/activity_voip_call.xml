@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/call_screen_background"
+    android:padding="0dp">
+
+    <!-- Top Section: Caller Info -->
+    <LinearLayout
+        android:id="@+id/caller_info_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="100dp"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+
+        <!-- Avatar -->
+        <ImageView
+            android:id="@+id/caller_image"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@drawable/ic_person"
+            android:background="@drawable/circle_background"
+            android:scaleType="centerCrop"
+            android:layout_marginBottom="16dp"
+            android:contentDescription="Caller Avatar"
+            android:elevation="6dp" />
+
+        <!-- Incoming Call Label -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Incoming Call"
+            android:textColor="#DDDDDD"
+            android:textSize="16sp"
+            android:layout_marginBottom="6dp" />
+
+        <!-- Caller Name -->
+        <TextView
+            android:id="@+id/caller_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="John Doe"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+    </LinearLayout>
+
+    <!-- Bottom Section: Call Controls -->
+    <LinearLayout
+        android:id="@+id/call_controls_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="80dp"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp"
+        android:weightSum="2">
+
+        <!-- Decline -->
+        <Button
+            android:id="@+id/reject_button"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="56dp"
+            android:text="Decline"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/flat_reject_button_background"
+            android:textStyle="bold"
+            android:layout_marginEnd="12dp" />
+
+        <!-- Accept -->
+        <Button
+            android:id="@+id/accept_button"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="56dp"
+            android:text="Accept"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/flat_accept_button_background"
+            android:textStyle="bold"
+            android:layout_marginStart="12dp" />
+    </LinearLayout>
+
+</RelativeLayout>
