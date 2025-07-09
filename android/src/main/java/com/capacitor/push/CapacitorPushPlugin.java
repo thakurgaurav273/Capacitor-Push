@@ -326,7 +326,7 @@ public class CapacitorPushPlugin extends Plugin {
     }
     // Method to handle incoming push notifications
     public void handlePushNotification(RemoteMessage remoteMessage) {
-        Log.d(TAG, "📥 Handling push notification");
+        Log.d("TAG", "📥 Handling push notification");
 
         Map<String, String> dataMap = remoteMessage.getData();
         String type = dataMap.get("type");

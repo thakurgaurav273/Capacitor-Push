@@ -19,24 +19,35 @@ public class VoIPCallReceiver {
 
     public static void handleIncomingMessage(Context context, RemoteMessage remoteMessage) {
         Log.d(TAG, "Handling incoming message");
-        
-        if (pluginInstance != null) {
-            pluginInstance.handlePushNotification(remoteMessage);
+        Map<String, String> dataMap = remoteMessage.getData();
+        String type = dataMap.get("type");
+
+        Log.e(TAG, "Incoming payload"+type);
+
+        if ("call".equals(type)) {
+            Log.d(TAG, "Fallback: Detected call type, showing incoming call UI");
+            NotificationUtils.showIncomingCallUI(context, remoteMessage); // <-- 🔔 new method
         } else {
-            Log.w(TAG, "Plugin instance is null, cannot handle message");
-            Log.w(TAG, "Plugin instance is null, checking for fallback type...");
-
-            Map<String, String> dataMap = remoteMessage.getData();
-            String type = dataMap.get("type");
-
-            if ("call".equals(type)) {
-                Log.d(TAG, "Fallback: Detected call type, showing incoming call UI");
-                NotificationUtils.showIncomingCallUI(context, remoteMessage); // <-- 🔔 new method
-            } else {
-                Log.d(TAG, "Fallback: Regular message, showing fallback notification");
-                NotificationUtils.showFallbackNotification(context, remoteMessage);
-            }
+            Log.d(TAG, "Fallback: Regular text message notification");
+            NotificationUtils.showFallbackNotification(context, remoteMessage);
         }
+//        if (pluginInstance != null) {
+//            pluginInstance.handlePushNotification(remoteMessage);
+//        } else {
+//            Log.w(TAG, "Plugin instance is null, cannot handle message");
+//            Map<String, String> dataMap = remoteMessage.getData();
+//            String type = dataMap.get("type");
+//
+//            Log.e(TAG, "handleIncomingMessage: GAURAV"+type);
+//
+//            if ("call".equals(type)) {
+//                Log.d(TAG, "Fallback: Detected call type, showing incoming call UI");
+//                NotificationUtils.showIncomingCallUI(context, remoteMessage); // <-- 🔔 new method
+//            } else {
+//                Log.d(TAG, "Fallback: Regular message, showing fallback notification");
+//                NotificationUtils.showFallbackNotification(context, remoteMessage);
+//            }
+//        }
     }
 
     public static void notifyTokenRefresh(String token) {

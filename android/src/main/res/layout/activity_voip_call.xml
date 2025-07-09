@@ -28,6 +28,7 @@
 
         <!-- Incoming Call Label -->
         <TextView
+            android:id="@+id/caller_type"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Incoming Call"

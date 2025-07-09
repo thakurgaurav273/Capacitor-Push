@@ -8,77 +8,62 @@
     android:layout_margin="0dp">
 
     <!-- Avatar -->
-    <ImageView
-        android:id="@+id/caller_avatar"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_marginEnd="8dp"
-        android:scaleType="centerCrop"
-        android:src="@drawable/ic_person"
-        android:background="@drawable/circle_background" />
 
     <!-- Caller Info and Buttons -->
     <LinearLayout
         android:layout_width="0dp"
-        android:layout_weight="1"
         android:layout_height="wrap_content"
+        android:layout_weight="1"
         android:orientation="vertical">
 
         <!-- Caller Name -->
-        <TextView
-            android:id="@+id/caller_name"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Caller Name"
-            android:textColor="@android:color/black"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:paddingTop="2dp" />
 
         <!-- Call Type -->
-        <TextView
-            android:id="@+id/call_type"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Incoming audio call"
-            android:textColor="@android:color/darker_gray"
-            android:textSize="14sp" />
 
         <!-- Buttons -->
+
+        <ImageView
+            android:id="@+id/caller_avatar"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/circle_background"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_person" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
             android:orientation="horizontal"
-            android:weightSum="2"
-            android:layout_marginTop="6dp">
+            android:weightSum="2">
 
-            <Button
-                android:id="@+id/reject_button"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="36dp"
-                android:text="Decline"
-                android:textColor="@android:color/white"
-                android:textStyle="bold"
-                android:background="@drawable/reject_button_background"
-                android:textSize="14sp"
-                android:minHeight="36dp"
-                android:layout_marginEnd="4dp" />
-
-            <Button
-                android:id="@+id/accept_button"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="36dp"
-                android:text="Accept"
-                android:textColor="@android:color/white"
-                android:textStyle="bold"
-                android:background="@drawable/accept_button_background"
-                android:textSize="14sp"
-                android:minHeight="36dp"
-                android:layout_marginStart="4dp" />
         </LinearLayout>
+
+        <Button
+            android:id="@+id/reject_button"
+            android:layout_width="116dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/reject_button_background"
+            android:minHeight="36dp"
+            android:text="Decline"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/accept_button"
+            android:layout_width="115dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/accept_button_background"
+            android:minHeight="36dp"
+            android:text="Accept"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>
