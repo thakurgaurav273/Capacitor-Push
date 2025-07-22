@@ -82,7 +82,28 @@ public class CapacitorPushPlugin extends Plugin {
         // Get initial token after Firebase initialization
         getInitialToken();
     }
+    private static CapacitorPushPlugin instance;
 
+    public CapacitorPushPlugin() {
+        instance = this;
+    }
+    public static void sendVoipCallAcceptedEvent(String sessionId) {
+        if (instance != null) {
+            JSObject callAction = new JSObject();
+            callAction.put("sessionId", sessionId);
+            callAction.put("type", "voip");
+            instance.notifyListeners("voipCallAccepted", callAction, true); // true = deliver even if in background
+        }
+    }
+
+    public static void sendVoipCallDeclineEvent(String sessionId) {
+        if (instance != null) {
+            JSObject callAction = new JSObject();
+            callAction.put("sessionId", sessionId);
+            callAction.put("type", "voip");
+            instance.notifyListeners("voipCallRejected", callAction, true); // true = deliver even if in background
+        }
+    }
     private void initializeFirebase() {
         try {
             if (FirebaseApp.getApps(getContext()).isEmpty()) {

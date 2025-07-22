@@ -1,9 +1,11 @@
 package com.capacitor.push;
 
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -24,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 //
@@ -558,7 +561,27 @@ public class NotificationUtils {
     public static final String CHANNEL_VOIP = "voip_calls";
     public static final String CHANNEL_MESSAGES = "messages_channel";
 
+
+    public static boolean isAppInForeground(Context context) {
+        ActivityManager activityManager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (activityManager == null) return false;
+
+        List<ActivityManager.RunningAppProcessInfo> appProcesses = activityManager.getRunningAppProcesses();
+        if (appProcesses != null) {
+            final String packageName = context.getPackageName();
+            for (ActivityManager.RunningAppProcessInfo appProcess : appProcesses) {
+                if (appProcess.processName.equals(packageName)) {
+                    return appProcess.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+                            || appProcess.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE;
+                }
+            }
+        }
+        return false;
+    }
+
+
     // === VOIP INCOMING CALL NOTIFICATION ===
+
     public static void showIncomingCallUI(Context context, RemoteMessage remoteMessage) {
         Map<String, String> dataMap = remoteMessage.getData();
         String sessionId = dataMap.get("sessionId");
@@ -566,6 +589,10 @@ public class NotificationUtils {
         String callType = dataMap.get("callType");
         String senderAvatar = dataMap.get("senderAvatar");
         String callAction = dataMap.get("callAction");
+//        if (isAppInForeground(context)) {
+//            // App is foreground: Provide in-app handling (show your own UI, or no-op)
+//            return;
+//        }
         if (sessionId == null || senderName == null) return;
 
         // ❌ Don't show notification for ended or cancelled call
@@ -595,18 +622,37 @@ public class NotificationUtils {
         );
 
         // ✅ Accept/Decline Intents
-        Intent acceptIntent = new Intent(context, CallActionReceiver.class);
-        acceptIntent.setAction("CALL_ACCEPT");
-        acceptIntent.putExtra("sessionId", sessionId);
-        PendingIntent acceptPendingIntent = PendingIntent.getBroadcast(
-                context, 0, acceptIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+//        Intent acceptIntent = new Intent(context, CallActionReceiver.class);
+//        acceptIntent.setAction("CALL_ACCEPT");
+//        acceptIntent.putExtra("sessionId", sessionId);
+//        acceptIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+//        PendingIntent acceptPendingIntent = PendingIntent.getBroadcast(
+//                context, 0, acceptIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+//        );
+
+        Intent launchAppIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+        if (launchAppIntent != null) {
+            launchAppIntent.setAction("com.capacitor.push.ACCEPT_CALL");
+            launchAppIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            launchAppIntent.putExtra("sessionId", sessionId);
+            // Optionally, add all needed extras here (voipData etc)
+        }
+        PendingIntent acceptPendingIntent = PendingIntent.getActivity(
+                context, 1001, launchAppIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        Intent declineIntent = new Intent(context, CallActionReceiver.class);
-        declineIntent.setAction("CALL_REJECT");
-        declineIntent.putExtra("sessionId", sessionId);
-        PendingIntent declinePendingIntent = PendingIntent.getBroadcast(
-                context, 1, declineIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        Intent declineIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+        if (declineIntent != null) {
+            declineIntent.setAction("com.capacitor.push.REJECT_CALL");
+            declineIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP |  Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            declineIntent.putExtra("sessionId", sessionId);
+        }
+
+        PendingIntent declinePendingIntent = PendingIntent.getActivity(
+                context,
+                2,
+                declineIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
         // ✅ Build full-screen notification
