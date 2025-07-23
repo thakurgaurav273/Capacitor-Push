@@ -34,6 +34,7 @@ npx cap sync
 * [`addListener('voipRegistration', ...)`](#addlistenervoipregistration-)
 * [`addListener('voipNotificationReceived', ...)`](#addlistenervoipnotificationreceived-)
 * [`addListener('voipTokenInvalidated', ...)`](#addlistenervoiptokeninvalidated-)
+* [`addListener('voipCallCancelled', ...)`](#addlistenervoipcallcancelled-)
 * [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
@@ -290,13 +291,13 @@ addListener(eventName: 'pushNotificationReceived', listenerFunc: (notification: 
 ### addListener('pushNotificationActionPerformed', ...)
 
 ```typescript
-addListener(eventName: 'pushNotificationActionPerformed', listenerFunc: (notification: ActionPerformed) => void) => Promise<PluginListenerHandle>
+addListener(eventName: 'pushNotificationActionPerformed', listenerFunc: (data: { id: string; convType: string; }) => void) => Promise<PluginListenerHandle>
 ```
 
-| Param              | Type                                                                                   |
-| ------------------ | -------------------------------------------------------------------------------------- |
-| **`eventName`**    | <code>'pushNotificationActionPerformed'</code>                                         |
-| **`listenerFunc`** | <code>(notification: <a href="#actionperformed">ActionPerformed</a>) =&gt; void</code> |
+| Param              | Type                                                              |
+| ------------------ | ----------------------------------------------------------------- |
+| **`eventName`**    | <code>'pushNotificationActionPerformed'</code>                    |
+| **`listenerFunc`** | <code>(data: { id: string; convType: string; }) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -351,6 +352,22 @@ addListener(eventName: 'voipTokenInvalidated', listenerFunc: (data: any) => void
 --------------------
 
 
+### addListener('voipCallCancelled', ...)
+
+```typescript
+addListener(eventName: 'voipCallCancelled', listenerFunc: (data: { sessionId: string; type: string; }) => void) => Promise<PluginListenerHandle>
+```
+
+| Param              | Type                                                                 |
+| ------------------ | -------------------------------------------------------------------- |
+| **`eventName`**    | <code>'voipCallCancelled'</code>                                     |
+| **`listenerFunc`** | <code>(data: { sessionId: string; type: string; }) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
 ### removeAllListeners()
 
 ```typescript
@@ -392,15 +409,6 @@ removeAllListeners() => Promise<void>
 | **`link`**         | <code>string</code>  |
 | **`group`**        | <code>string</code>  |
 | **`groupSummary`** | <code>boolean</code> |
-
-
-#### ActionPerformed
-
-| Prop               | Type                                                                      |
-| ------------------ | ------------------------------------------------------------------------- |
-| **`actionId`**     | <code>string</code>                                                       |
-| **`inputValue`**   | <code>string</code>                                                       |
-| **`notification`** | <code><a href="#pushnotificationschema">PushNotificationSchema</a></code> |
 
 
 #### VoIPNotificationSchema

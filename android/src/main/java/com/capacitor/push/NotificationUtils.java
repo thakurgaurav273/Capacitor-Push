@@ -699,16 +699,38 @@ public class NotificationUtils {
         String title = dataMap.get("title");
         String body = dataMap.get("body");
         String senderAvatar = dataMap.get("senderAvatar");
-
-
+        Log.d("TAG", "showFallbackNotification: "+ remoteMessage);
+        String receiverType = dataMap.get("receiverType"); // "user" or "group" expected
+        String sender = dataMap.get("sender");
+        String receiver = dataMap.get("receiver");
         createMessageChannel(context);
+        Intent tapIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+        assert tapIntent != null;
 
+        String id;
+        String convType;
 
-        Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+        if ("user".equalsIgnoreCase(receiverType)) {
+            id = sender;
+            convType = "user";
+        } else {
+            id = receiver;
+            convType = "group";
+        }
+        tapIntent.setAction("com.capacitor.push.NOTIFICATION_TAPPED");
+        tapIntent.putExtra("id", id);        // or some notification ID
+        tapIntent.putExtra("convType",convType); // pass any needed extras
+
+// Important: add flags so the existing activity gets the intent via onNewIntent()
+        tapIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
         PendingIntent pendingIntent = PendingIntent.getActivity(
-                context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-        );
+                context, 0, tapIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+//        Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+//        PendingIntent pendingIntent = PendingIntent.getActivity(
+//                context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+//        );
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_MESSAGES)
                 .setContentTitle(title != null ? title : "New Message")
                 .setContentText(body != null ? body : "")

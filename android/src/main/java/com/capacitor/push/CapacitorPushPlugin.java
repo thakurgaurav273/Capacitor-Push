@@ -104,6 +104,15 @@ public class CapacitorPushPlugin extends Plugin {
             instance.notifyListeners("voipCallRejected", callAction, true); // true = deliver even if in background
         }
     }
+
+    public static void sendNotificationClicked(String id, String convType){
+        if (instance != null) {
+            JSObject onTap = new JSObject();
+            onTap.put("id", id);
+            onTap.put("convType", convType);
+            instance.notifyListeners("pushNotificationActionPerformed", onTap, true); // true = deliver even if in background
+        }
+    }
     private void initializeFirebase() {
         try {
             if (FirebaseApp.getApps(getContext()).isEmpty()) {

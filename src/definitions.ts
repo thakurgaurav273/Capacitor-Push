@@ -89,7 +89,7 @@ export interface CapacitorPushPlugin {
 
   addListener(
     eventName: 'pushNotificationActionPerformed',
-    listenerFunc: (notification: ActionPerformed) => void,
+    listenerFunc: (data: { id: string, convType: string}) => void,
   ): Promise<PluginListenerHandle>;
   addListener(eventName: 'voipRegistration', listenerFunc: (data: {
     token: string;
