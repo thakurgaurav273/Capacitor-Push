@@ -23,14 +23,6 @@
         android:hardwareAccelerated="true"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true">
-        <service
-            android:name=".VoIPCallService"
-            android:enabled="true"
-            android:exported="true"></service>
-        <!-- ✅ Receiver now inside <application> -->
-        <receiver
-            android:name=".CallActionReceiver"
-            android:exported="true" /> <!-- VoIP Call Activity -->
         <activity
             android:name=".VoIPCallActivity"
             android:exported="true"

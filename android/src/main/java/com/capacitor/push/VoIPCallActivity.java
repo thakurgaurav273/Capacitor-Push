@@ -1,12 +1,18 @@
 package com.capacitor.push;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.NotificationManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.Gravity;
 import android.widget.Button;
@@ -28,29 +34,9 @@ public class VoIPCallActivity extends Activity {
     private String sessionId, name, type, avatar;
     private JSObject voipData;
 
-    private TextView callerInfo;
-
-//    public static Bitmap getBitmapFromURL(String strURL) {
-//        if (strURL != null) {
-//            try {
-//                URL url = new URL(strURL);
-//                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-//                connection.setDoInput(true);
-//                connection.connect();
-//                InputStream input = connection.getInputStream();
-//                return BitmapFactory.decodeStream(input);
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        }
-//        return null;
-//    }
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-//        createLayout();
 
         setContentView(R.layout.activity_voip_call);
         TextView callerName = findViewById(R.id.caller_name);
@@ -74,7 +60,16 @@ public class VoIPCallActivity extends Activity {
                 callerName.setText(name);
                 callType.setText(type + " Call");
 //                imageView.setImageBitmap(getBitmapFromURL(avatar));
-
+                // Your existing setup code...
+                if (!"unknown".equals(avatar) && !TextUtils.isEmpty(avatar)) {
+                    loadAvatarAsync(avatar, imageView);
+                } else {
+                    imageView.setImageResource(R.drawable.circle_background);
+                }
+                if (sessionId != null) {
+                    NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                    if (nm != null) nm.cancel(sessionId.hashCode());
+                }
             } catch (Exception e) {
                 Log.e(TAG, "❌ Error parsing VoIP data", e);
                 finish();
@@ -92,99 +87,83 @@ public class VoIPCallActivity extends Activity {
         });
 
     }
-
-    /*private void createLayout() {
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setGravity(Gravity.CENTER);
-        layout.setPadding(50, 50, 50, 50);
-        layout.setBackgroundColor(Color.parseColor("#1E1E1E")); // Dark background
-
-        callerInfo = new TextView(this);
-        callerInfo.setText("Incoming Call...");
-        callerInfo.setTextSize(24);
-        callerInfo.setTextColor(Color.WHITE);
-        callerInfo.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        textParams.setMargins(0, 0, 0, 100);
-        callerInfo.setLayoutParams(textParams);
-        layout.addView(callerInfo);
-
-        // Button container
-        LinearLayout buttonContainer = new LinearLayout(this);
-        buttonContainer.setOrientation(LinearLayout.HORIZONTAL);
-        buttonContainer.setGravity(Gravity.CENTER);
-
-        // Reject Button
-        Button rejectButton = new Button(this);
-        rejectButton.setText("Reject");
-        rejectButton.setTextColor(Color.WHITE);
-        rejectButton.setBackgroundColor(Color.RED);
-        rejectButton.setTextSize(16);
-        styleButton(rejectButton, Color.parseColor("#F44336")); // Red
-        rejectButton.setOnClickListener(v -> rejectCall());
-
-        LinearLayout.LayoutParams rejectParams = new LinearLayout.LayoutParams(
-                200, 120
-        );
-        rejectParams.setMargins(0, 0, 50, 0);
-        rejectButton.setLayoutParams(rejectParams);
-        buttonContainer.addView(rejectButton);
-
-        // Accept Button
-        Button acceptButton = new Button(this);
-        acceptButton.setText("Accept");
-        acceptButton.setTextColor(Color.WHITE);
-        acceptButton.setBackgroundColor(Color.GREEN);
-        acceptButton.setTextSize(16);
-        styleButton(acceptButton, Color.parseColor("#4CAF50")); // Green
-        acceptButton.setOnClickListener(v -> acceptCall());
-
-        LinearLayout.LayoutParams acceptParams = new LinearLayout.LayoutParams(
-                200, 120
-        );
-        acceptParams.setMargins(50, 0, 0, 0);
-        acceptButton.setLayoutParams(acceptParams);
-        buttonContainer.addView(acceptButton);
-
-        layout.addView(buttonContainer);
-        setContentView(layout);
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    @Override
+    protected void onResume() {
+        super.onResume();
+        registerReceiver(callCancelledReceiver, new IntentFilter("com.capacitor.push.ACTION_CALL_CANCELLED"));
     }
 
-    private void styleButton(Button button, int backgroundColor) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.RECTANGLE);
-        drawable.setColor(backgroundColor);
-        drawable.setCornerRadius(25); // Rounded corners
-        drawable.setStroke(3, Color.WHITE); // White border
-        button.setBackground(drawable);
-        button.setElevation(8); // Add shadow
+    @Override
+    protected void onPause() {
+        super.onPause();
+        unregisterReceiver(callCancelledReceiver);
     }
 
-    private void updateCallInfo() {
-        if (voipData != null) {
-            String callerName = voipData.getString("senderName", "Unknown Caller");
-            String callType = voipData.getString("callType", "audio");
-
-            callerInfo.setText("Incoming " + callType + " call from\n" + callerName);
+    private final BroadcastReceiver callCancelledReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String cancelledSessionId = intent.getStringExtra("sessionId");
+            if (cancelledSessionId != null && cancelledSessionId.equals(sessionId)) {
+                finish();
+            }
         }
-    }*/
+    };
+    private void bringAppToForeground() {
+        Intent mainIntent = getApplicationContext()
+                .getPackageManager()
+                .getLaunchIntentForPackage(getApplicationContext().getPackageName());
+        if (mainIntent != null) {
+            mainIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(mainIntent);
+        }
+    }
 
     public void acceptCall() {
-        Log.d(TAG, "✅ Call accepted");
-        VoIPCallReceiver.handleCallAction( sessionId, "accept");
-        finish();
+        Log.d(TAG, "✅ Call accepted in activity");
+        bringAppToForeground();
+        // Optionally, use a Handler to delay firing event by 200ms to ensure JS listeners have time to attach
+        new android.os.Handler().postDelayed(() -> {
+            CapacitorPushPlugin.sendVoipCallAcceptedEvent(sessionId, type);
+            VoIPCallReceiver.handleCallAction(sessionId, "accept");
+            finish();
+        }, 150); // 100-200ms delay is common
     }
-
     public void rejectCall() {
         Log.d(TAG, "❌ Call rejected");
-        VoIPCallReceiver.handleCallAction( sessionId, "reject");
-        finish();
+        bringAppToForeground();
+        new android.os.Handler().postDelayed(() -> {
+            CapacitorPushPlugin.sendVoipCallDeclineEvent(sessionId);
+            VoIPCallReceiver.handleCallAction(sessionId, "reject");
+            finish();
+        }, 150);
     }
-
+    private void loadAvatarAsync(String url, ImageView imageView) {
+        new Thread(() -> {
+            Bitmap bmp = getBitmapFromURL(url);
+            runOnUiThread(() -> {
+                if (bmp != null) {
+                    imageView.setImageBitmap(bmp);
+                } else {
+                    imageView.setImageResource(R.drawable.circle_background);
+                }
+            });
+        }).start();
+    }
+    public static Bitmap getBitmapFromURL(String strURL) {
+        try {
+            URL url = new URL(strURL);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setDoInput(true);
+            connection.connect();
+            InputStream input = connection.getInputStream();
+            return BitmapFactory.decodeStream(input);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
     @Override
     protected void onDestroy() {
         super.onDestroy();
