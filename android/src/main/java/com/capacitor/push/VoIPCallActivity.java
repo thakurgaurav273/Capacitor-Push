@@ -125,7 +125,7 @@ public class VoIPCallActivity extends Activity {
         // Optionally, use a Handler to delay firing event by 200ms to ensure JS listeners have time to attach
         new android.os.Handler().postDelayed(() -> {
             CapacitorPushPlugin.sendVoipCallAcceptedEvent(sessionId, type);
-            VoIPCallReceiver.handleCallAction(sessionId, "accept");
+//            VoIPCallReceiver.handleCallAction(sessionId, "accept");
             finish();
         }, 150); // 100-200ms delay is common
     }
@@ -134,7 +134,7 @@ public class VoIPCallActivity extends Activity {
         bringAppToForeground();
         new android.os.Handler().postDelayed(() -> {
             CapacitorPushPlugin.sendVoipCallDeclineEvent(sessionId);
-            VoIPCallReceiver.handleCallAction(sessionId, "reject");
+//            VoIPCallReceiver.handleCallAction(sessionId, "reject");
             finish();
         }, 150);
     }

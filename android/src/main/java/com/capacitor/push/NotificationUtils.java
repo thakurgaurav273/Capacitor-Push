@@ -60,7 +60,7 @@ public class NotificationUtils {
         }
 
 
-        if ("cancelled".equalsIgnoreCase(callAction) || "accepted".equalsIgnoreCase(callAction) || "ongoing".equalsIgnoreCase(callAction) || "ended".equalsIgnoreCase(callAction)) {
+        if ("cancelled".equalsIgnoreCase(callAction) || "rejected".equalsIgnoreCase(callAction) || "accepted".equalsIgnoreCase(callAction) || "ongoing".equalsIgnoreCase(callAction) || "ended".equalsIgnoreCase(callAction)) {
             NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager != null) {
                 manager.cancel(sessionId.hashCode());

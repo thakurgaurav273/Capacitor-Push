@@ -72,7 +72,7 @@ public class CapacitorPushPlugin extends Plugin {
         VoIPCallReceiver.setPluginInstance(this);
         
         // Get initial token after Firebase initialization
-        getInitialToken();
+//        getInitialToken();
     }
 //        following code provides the plugin instance to the app for launching from background and triggering listeners
     private static CapacitorPushPlugin instance;
