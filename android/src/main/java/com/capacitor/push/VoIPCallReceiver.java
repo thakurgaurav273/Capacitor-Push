@@ -1,7 +1,10 @@
 package com.capacitor.push;
 
+import android.Manifest;
 import android.content.Context;
 import android.util.Log;
+
+import androidx.annotation.RequiresPermission;
 
 import com.getcapacitor.JSObject;
 import com.google.firebase.messaging.RemoteMessage;
@@ -17,6 +20,7 @@ public class VoIPCallReceiver {
         Log.d(TAG, "Plugin instance set");
     }
 
+    @RequiresPermission(Manifest.permission.READ_PHONE_STATE)
     public static void handleIncomingMessage(Context context, RemoteMessage remoteMessage) {
         Log.d(TAG, "Handling incoming message");
         Map<String, String> dataMap = remoteMessage.getData();
@@ -43,16 +47,6 @@ public class VoIPCallReceiver {
             pluginInstance.handleTokenRefresh(tokenData);
         } else {
             Log.w(TAG, "Plugin instance is null, cannot notify token refresh");
-        }
-    }
-
-    public static void handleCallAction(String sessionId, String action) {
-        Log.d(TAG, "Handling call action: " + action + " for session: " + sessionId);
-        
-        if (pluginInstance != null) {
-            pluginInstance.handleVoIPCallAction(sessionId, action);
-        } else {
-            Log.w(TAG, "Plugin instance is null, cannot handle call action");
         }
     }
 }

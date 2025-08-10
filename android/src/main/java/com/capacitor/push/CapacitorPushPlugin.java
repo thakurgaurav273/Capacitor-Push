@@ -37,6 +37,9 @@ import java.net.URL;
                         alias = "phone",
                         strings = {
                                 Manifest.permission.CALL_PHONE,
+                                Manifest.permission.MANAGE_OWN_CALLS,
+                                Manifest.permission.ANSWER_PHONE_CALLS,
+                                Manifest.permission.CALL_PHONE,
                                 Manifest.permission.READ_PHONE_STATE,
                                 Manifest.permission.SYSTEM_ALERT_WINDOW,
                                 Manifest.permission.USE_FULL_SCREEN_INTENT
@@ -61,7 +64,7 @@ public class CapacitorPushPlugin extends Plugin {
     @Override
     public void load() {
         Log.d(TAG, "Loading CapacitorPush plugin");
-        
+
         // Initialize Firebase first
         initializeFirebase();
         
@@ -70,7 +73,10 @@ public class CapacitorPushPlugin extends Plugin {
 
         // Set this plugin instance in the bridge
         VoIPCallReceiver.setPluginInstance(this);
-        
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                PhoneAccountUtils.registerPhoneAccount(getContext());
+            }
+
         // Get initial token after Firebase initialization
 //        getInitialToken();
     }
@@ -183,10 +189,14 @@ public class CapacitorPushPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    public static CapacitorPushPlugin getInstance() {
+        return instance;
+    }
+
     @PluginMethod
     public void register(PluginCall call) {
         Log.d(TAG, "Register method called");
-        
+
         try {
             FirebaseMessaging.getInstance().getToken()
                     .addOnCompleteListener(task -> {
@@ -286,6 +296,8 @@ public class CapacitorPushPlugin extends Plugin {
     public void requestPermissions(PluginCall call) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissionForAlias("notifications", call, "permissionCallback");
+            requestPermissionForAlias("phone", call, "permissionCallback");
+
         } else {
             JSObject ret = new JSObject();
             ret.put("receive", "granted");
@@ -330,41 +342,7 @@ public class CapacitorPushPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    private Bitmap getBitmapFromURL(String strURL) {
-        if (strURL != null) {
-            try {
-                URL url = new URL(strURL);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setDoInput(true);
-                connection.connect();
-                InputStream input = connection.getInputStream();
-                return BitmapFactory.decodeStream(input);
-            } catch (IOException e) {
-                e.printStackTrace();
-                return null;
-            }
-        } else {
-            return null;
-        }
-    }
     // Method to handle VoIP call actions
-    public void handleVoIPCallAction(String sessionId, String action) {
-        JSObject callAction = new JSObject();
-        callAction.put("sessionId", sessionId);
-        callAction.put("type", "voip");
-
-        switch (action) {
-            case "accept":
-                notifyListeners("voipCallAccepted", callAction);
-                break;
-            case "reject":
-                notifyListeners("voipCallRejected", callAction);
-                break;
-            case "cancel":
-                notifyListeners("voipCallCancelled", callAction);
-                break;
-        }
-    }
 
     // PUBLIC METHOD FOR TOKEN REFRESH
     public void handleTokenRefresh(JSObject tokenData) {
