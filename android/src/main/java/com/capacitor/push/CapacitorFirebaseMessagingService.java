@@ -61,15 +61,8 @@ public class CapacitorFirebaseMessagingService extends FirebaseMessagingService 
      */
     @Override
     public void onNewToken(@NonNull String token) {
-        Log.d(TAG, "Refreshed token: " + token);
-
-        // Create token data object for plugin
-        JSObject tokenData = new JSObject();
-        tokenData.put("token", token);
-
-        // Notify plugin about token refresh
         try {
-            VoIPCallReceiver.notifyTokenRefresh(String.valueOf(tokenData));
+            VoIPCallReceiver.notifyTokenRefresh(token);
         } catch (Exception e) {
             Log.e(TAG, "Error notifying token refresh", e);
         }

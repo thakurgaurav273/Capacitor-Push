@@ -64,15 +64,12 @@ public class VoIPCallReceiver {
      */
     public static void notifyTokenRefresh(String token) {
         Log.d(TAG, "Token refresh notification: " + token);
-        
+
         if (pluginInstance != null) {
-            // Construct JSObject for token refresh event
             JSObject tokenData = new JSObject();
             tokenData.put("token", token);
-            // Notify plugin instance of refreshed token
             pluginInstance.handleTokenRefresh(tokenData);
         } else {
-            // Warn if plugin instance is not set
             Log.w(TAG, "Plugin instance is null, cannot notify token refresh");
         }
     }
