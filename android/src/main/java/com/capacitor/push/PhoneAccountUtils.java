@@ -38,20 +38,20 @@ public class PhoneAccountUtils {
      */
     public static void registerPhoneAccount(Context context) {
         TelecomManager telecomManager = (TelecomManager) context.getSystemService(Context.TELECOM_SERVICE);
-
+        String appName = context.getApplicationInfo().loadLabel(context.getPackageManager()).toString();
         // Create an icon to display for the PhoneAccount in system UI
-        Icon accountIcon = Icon.createWithResource(context, R.drawable.ic_whatsapp_small);
+        Icon appIcon = Icon.createWithResource(context, context.getApplicationInfo().icon);
         // Build PhoneAccount with required capabilities and metadata
         PhoneAccount phoneAccount = PhoneAccount.builder(
                         getPhoneAccountHandle(context),
-                        "WhatsApp Clone" // Visible name in system phone UI
+                        appName // Visible name in system phone UI
                 )
                 .setCapabilities(
                         PhoneAccount.CAPABILITY_CALL_PROVIDER | // Required for call provider
                                 PhoneAccount.CAPABILITY_CONNECTION_MANAGER | // Allows managing calls
                                 PhoneAccount.CAPABILITY_PLACE_EMERGENCY_CALLS // Allows emergency calls
                 )
-                .setIcon(accountIcon)  // Displayed in phone app and call logs
+                .setIcon(appIcon)  // Displayed in phone app and call logs
                 .setShortDescription("VoIP Calls")  // Short summary shown in UI
                 .setSupportedUriSchemes(java.util.Arrays.asList(
                         PhoneAccount.SCHEME_TEL,  // Standard tel: numbers

@@ -1,9 +1,14 @@
 package com.capacitor.push;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
+import android.telecom.PhoneAccountHandle;
+import android.telecom.TelecomManager;
 import android.util.Log;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -14,6 +19,8 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.messaging.FirebaseMessaging;
+
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -74,6 +81,7 @@ public class CapacitorPushPlugin extends Plugin {
     protected static String KEY_RECEIVER = "receiver";
     protected static String KEY_TAG = "tag";
     protected static String EVENT_NOTIFICATION_CLICKED = "NOTIFICATION_TAPPED";
+    private PluginCall savedCall;
 
 
     /**
@@ -136,7 +144,7 @@ public class CapacitorPushPlugin extends Plugin {
 
         // Initialize Firebase first
         initializeFirebase();
-        
+
         implementation = new CapacitorPush(getContext(), this);
         createNotificationChannels();
 
@@ -246,7 +254,7 @@ public class CapacitorPushPlugin extends Plugin {
     /**
      * Creates required notification channels used for push and VoIP notifications (Android 13+).
      */
-
+    
     private void createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             NotificationManager notificationManager = getContext().getSystemService(NotificationManager.class);
@@ -357,7 +365,7 @@ public class CapacitorPushPlugin extends Plugin {
                     .addOnCompleteListener(task -> {
                         if (!task.isSuccessful()) {
                             Log.e(TAG, "Failed to get token", task.getException());
-                            call.reject("Failed to get token: " + task.getException().getMessage());
+                            call.reject("Failed to get token: " + Objects.requireNonNull(task.getException()).getMessage());
                             return;
                         }
 
@@ -403,7 +411,7 @@ public class CapacitorPushPlugin extends Plugin {
     @PluginMethod
     public void enableVoIP(PluginCall call) {
         Boolean enable = call.getBoolean("enable", true);
-        implementation.setVoIPEnabled(enable);
+        implementation.setVoIPEnabled(Boolean.TRUE.equals(enable));
         call.resolve();
     }
 
@@ -429,13 +437,144 @@ public class CapacitorPushPlugin extends Plugin {
     @PluginMethod
     public void requestPermissions(PluginCall call) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requestPermissionForAlias("notifications", call, "permissionCallback");
-            requestPermissionForAlias("phone", call, "permissionCallback");
+            // Store the call for the final callback
+            this.savedCall = call;
+
+            // Start the sequential permission request chain
+            requestNotificationPermission();
 
         } else {
             JSObject ret = new JSObject();
             ret.put("receive", "granted");
+            ret.put("phone", "granted");
+            ret.put("cameraAndMic", "granted");
             call.resolve(ret);
+        }
+    }
+    /**
+     * First step: Request notification permissions
+     */
+    private void requestNotificationPermission() {
+        requestPermissionForAlias("notifications", savedCall, "notificationPermissionCallback");
+    }
+    /**
+     * Second step: Request phone permissions after notifications are handled
+     */
+    @PermissionCallback
+    private void notificationPermissionCallback(PluginCall call) {
+        Log.d(TAG, "Notification permission callback completed");
+        // Don't resolve the call yet, continue to next permission
+        requestPermissionForAlias("phone", savedCall, "phonePermissionCallback");
+    }
+
+    /**
+     * Third step: Request camera and mic permissions after phone permissions are handled
+     */
+    @PermissionCallback
+    private void phonePermissionCallback(PluginCall call) {
+        Log.d(TAG, "Phone permission callback completed");
+        // Don't resolve the call yet, continue to next permission
+        requestPermissionForAlias("cameraAndMic", savedCall, "cameraAndMicPermissionCallback");
+    }
+
+    /**
+     * Final step: Handle the last permission and check phone account
+     */
+    @PermissionCallback
+    private void cameraAndMicPermissionCallback(PluginCall call) {
+        Log.d(TAG, "Camera and mic permission callback completed");
+
+        // All permissions requested, now check phone account
+        new android.os.Handler().postDelayed(this::checkAndPromptPhoneAccount, 500);
+
+        // Return the final permission states
+        JSObject ret = new JSObject();
+        String notificationPermission = getPermissionState("notifications").toString();
+        String phonePermission = getPermissionState("phone").toString();
+        String cameraAndMicPermission = getPermissionState("cameraAndMic").toString();
+
+        ret.put("receive", notificationPermission);
+        ret.put("phone", phonePermission);
+        ret.put("cameraAndMic", cameraAndMicPermission);
+
+        call.resolve(ret);
+
+        // Clear the saved call
+        savedCall = null;
+    }
+
+    /**
+     * Checks if the app's phone account is enabled and prompts user to enable it if not.
+     * This is required for VoIP functionality to work properly.
+     */
+    private void checkAndPromptPhoneAccount() {
+        try {
+            TelecomManager telecomManager = (TelecomManager) getContext().getSystemService(Context.TELECOM_SERVICE);
+            if (telecomManager == null) {
+                Log.e(TAG, "TelecomManager is null");
+                return;
+            }
+
+            boolean enabled = false;
+            try {
+                List<PhoneAccountHandle> accounts = telecomManager.getCallCapablePhoneAccounts();
+                for (PhoneAccountHandle handle : accounts) {
+                    if (PhoneAccountUtils.PHONE_ACCOUNT_ID.equals(handle.getId())) {
+                        enabled = true;
+                        break;
+                    }
+                }
+            } catch (SecurityException e) {
+                Log.e(TAG, "SecurityException checking phone accounts - permission may not be granted yet", e);
+                return;
+            } catch (Exception e) {
+                Log.e(TAG, "Error checking phone accounts", e);
+                return;
+            }
+
+            if (!enabled) {
+                // Get the activity context for showing the dialog
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        try {
+                            String appName = getContext().getApplicationInfo().loadLabel(getContext().getPackageManager()).toString();
+
+                            new AlertDialog.Builder(getActivity())
+                                    .setTitle("Enable Call Account")
+                                    .setMessage("To receive calls, please enable '" + appName +
+                                            "' in the phone accounts settings.")
+                                    .setPositiveButton("Open Settings", (dialog, which) -> {
+                                        try {
+                                            Intent settingsIntent = new Intent(TelecomManager.ACTION_CHANGE_PHONE_ACCOUNTS);
+                                            settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                            getActivity().startActivity(settingsIntent);
+                                        } catch (Exception e) {
+                                            Log.e(TAG, "Failed to open phone account settings", e);
+                                            // Fallback to general settings if specific intent fails
+                                            try {
+                                                Intent generalSettings = new Intent(android.provider.Settings.ACTION_SETTINGS);
+                                                generalSettings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                                getActivity().startActivity(generalSettings);
+                                            } catch (Exception fallbackException) {
+                                                Log.e(TAG, "Failed to open any settings", fallbackException);
+                                            }
+                                        }
+                                    })
+                                    .setNegativeButton("Cancel", null)
+                                    .setCancelable(true)
+                                    .show();
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error showing phone account dialog", e);
+                        }
+                    });
+                } else {
+                    Log.w(TAG, "Activity is null, cannot show phone account dialog");
+                }
+            } else {
+                Log.d(TAG, "Phone account is already enabled");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Unexpected error in checkAndPromptPhoneAccount", e);
         }
     }
     /**
@@ -448,15 +587,21 @@ public class CapacitorPushPlugin extends Plugin {
         JSObject ret = new JSObject();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            String permission = getPermissionState("notifications").toString();
-            ret.put("receive", permission);
+            String notificationPermission = getPermissionState("notifications").toString();
+            String phonePermission = getPermissionState("phone").toString();
+            String cameraAndMicPermission = getPermissionState("cameraAndMic").toString();
+
+            ret.put("receive", notificationPermission);
+            ret.put("phone", phonePermission);
+            ret.put("cameraAndMic", cameraAndMicPermission);
         } else {
             ret.put("receive", "granted");
+            ret.put("phone", "granted");
+            ret.put("cameraAndMic", "granted");
         }
 
         call.resolve(ret);
-    }
-    /**
+    }    /**
      * Test method to verify VoIP setup availability in JS bridge.
      *
      * @param call The PluginCall from JS.
@@ -470,24 +615,6 @@ public class CapacitorPushPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    /**
-     * Permission callback handler after user responds to permission request.
-     *
-     * @param call The PluginCall waiting on the permission result.
-     */
-    @PermissionCallback
-    private void permissionCallback(PluginCall call) {
-        JSObject ret = new JSObject();
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            String permission = getPermissionState("notifications").toString();
-            ret.put("receive", permission);
-        } else {
-            ret.put("receive", "granted");
-        }
-
-        call.resolve(ret);
-    }
     /**
      * Handles token refresh event and notifies JS listeners.
      *

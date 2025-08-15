@@ -249,7 +249,7 @@ public class NotificationUtils {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_MESSAGES)
                 .setContentTitle(title != null ? title : "New Message")
                 .setContentText(body != null ? body : "")
-                .setSmallIcon(R.drawable.ic_whatsapp_small)
+                .setSmallIcon(context.getApplicationInfo().icon)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent);
