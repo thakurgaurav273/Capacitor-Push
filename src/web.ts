@@ -75,6 +75,38 @@ export class CapacitorPushWeb extends WebPlugin implements CapacitorPushPlugin {
     };
   }
 
+  async setKeyMappings(options: {
+    sessionKey?: string;
+    senderKey?: string;
+    titleKey?: string;
+    bodyKey?: string;
+    senderAvatarKey?: string;
+    receiverTypeKey?: string;
+    receiverKey?: string;
+    tagKey?: string;
+  }): Promise<{
+    sessionKey: string;
+    senderKey: string;
+    titleKey: string;
+    bodyKey: string;
+    senderAvatarKey: string;
+    receiverTypeKey: string;
+    receiverKey: string;
+    tagKey: string;
+  }> {
+    // On web, you can just return the provided keys (or some defaults)
+    return {
+      sessionKey: options.sessionKey ?? 'sessionId',
+      senderKey: options.senderKey ?? 'senderName',
+      titleKey: options.titleKey ?? 'title',
+      bodyKey: options.bodyKey ?? 'body',
+      senderAvatarKey: options.senderAvatarKey ?? 'senderAvatar',
+      receiverTypeKey: options.receiverTypeKey ?? 'receiverType',
+      receiverKey: options.receiverKey ?? 'receiver',
+      tagKey: options.tagKey ?? 'tag',
+    };
+  }
+
   async testVoIPSetup(): Promise<{
     isVoIPSupported: boolean;
     hasVoIPToken: boolean;
