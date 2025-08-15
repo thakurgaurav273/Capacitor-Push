@@ -23,6 +23,7 @@ npx cap sync
 * [`requestPermissions()`](#requestpermissions)
 * [`checkPermissions()`](#checkpermissions)
 * [`testVoIPSetup()`](#testvoipsetup)
+* [`setKeyMappings(...)`](#setkeymappings)
 * [`addListener('registration', ...)`](#addlistenerregistration-)
 * [`addListener('voipTokenReceived', ...)`](#addlistenervoiptokenreceived-)
 * [`addListener('apnsTokenReceived', ...)`](#addlistenerapnstokenreceived-)
@@ -170,6 +171,23 @@ testVoIPSetup() => Promise<{ isVoIPSupported: boolean; hasVoIPToken: boolean; vo
 Test VoIP setup (iOS only)
 
 **Returns:** <code>Promise&lt;{ isVoIPSupported: boolean; hasVoIPToken: boolean; voipToken: string; }&gt;</code>
+
+--------------------
+
+
+### setKeyMappings(...)
+
+```typescript
+setKeyMappings(options: { sessionKey?: string; senderKey?: string; titleKey?: string; bodyKey?: string; senderAvatarKey?: string; receiverTypeKey?: string; receiverKey?: string; tagKey?: string; }) => Promise<{ sessionKey: string; senderKey: string; titleKey: string; bodyKey: string; senderAvatarKey: string; receiverTypeKey: string; receiverKey: string; tagKey: string; }>
+```
+
+Set custom payload key mappings for flexible payload parsing
+
+| Param         | Type                                                                                                                                                                                      |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ sessionKey?: string; senderKey?: string; titleKey?: string; bodyKey?: string; senderAvatarKey?: string; receiverTypeKey?: string; receiverKey?: string; tagKey?: string; }</code> |
+
+**Returns:** <code>Promise&lt;{ sessionKey: string; senderKey: string; titleKey: string; bodyKey: string; senderAvatarKey: string; receiverTypeKey: string; receiverKey: string; tagKey: string; }&gt;</code>
 
 --------------------
 

@@ -3,8 +3,6 @@ package com.capacitor.push;
 import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.util.Log;
 import com.getcapacitor.JSObject;
@@ -14,14 +12,15 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
-
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.messaging.FirebaseMessaging;
+import java.util.Objects;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+/**
+ * CapacitorPushPlugin
+ * Main plugin class for handling push notifications, VoIP, and related permissions.
+ * Exposes methods for registering, permission management, and notification channel setup.
+ */
 @CapacitorPlugin(
         name = "CapacitorPush",
         permissions = {
@@ -55,12 +54,82 @@ import java.net.URL;
         }
 )
 public class CapacitorPushPlugin extends Plugin {
+    // Logging TAG and notification channel IDs
     private static final String TAG = "CapacitorPush";
     private static final String CHANNEL_ID = "capacitor_push_notifications";
     private static final String VOIP_CHANNEL_ID = "capacitor_voip_notifications";
-
+    // Push implementation instance
     private CapacitorPush implementation;
+    // Key mappings for push notification payload fields
+    protected static String KEY_SESSION_ID = "sessionId";
+    protected static String KEY_TYPE = "type";
+    protected static String KEY_CALL_TYPE = "callType";
+    protected static String KEY_CALL_ACTION = "callAction";
+    protected static String KEY_SENDER_NAME = "senderName";
+    protected static String KEY_TITLE = "title";
+    protected static String KEY_BODY = "body";
+    protected static String KEY_SENDER_AVATAR = "senderAvatar";
+    protected static String KEY_RECEIVER_TYPE = "receiverType";
+    protected static String KEY_SENDER = "sender";
+    protected static String KEY_RECEIVER = "receiver";
+    protected static String KEY_TAG = "tag";
+    protected static String EVENT_NOTIFICATION_CLICKED = "NOTIFICATION_TAPPED";
 
+
+    /**
+     * Dynamically sets key mappings used for parsing notification payloads.
+     * Allows JS side to adjust field names used for sessionId, sender, title, etc.
+     *
+     * @param call Capacitor PluginCall containing mapping keys as strings.
+     */
+
+    @PluginMethod
+    public void setKeyMappings(PluginCall call) {
+        String sessionKey = call.getString("sessionKey");
+        if (sessionKey != null && !sessionKey.isEmpty()) { KEY_SESSION_ID = sessionKey; }
+
+        String senderKey = call.getString("senderKey");
+        if (senderKey != null && !senderKey.isEmpty()) { KEY_SENDER_NAME = senderKey; }
+
+        String titleKey = call.getString("titleKey");
+        if (titleKey != null && !titleKey.isEmpty()) { KEY_TITLE = titleKey; }
+
+        String bodyKey = call.getString("bodyKey");
+        if (bodyKey != null && !bodyKey.isEmpty()) { KEY_BODY = bodyKey; }
+
+        String senderAvatarKey = call.getString("senderAvatarKey");
+        if (senderAvatarKey != null && !senderAvatarKey.isEmpty()) { KEY_SENDER_AVATAR = senderAvatarKey; }
+
+        String receiverTypeKey = call.getString("receiverTypeKey");
+        if (receiverTypeKey != null && !receiverTypeKey.isEmpty()) { KEY_RECEIVER_TYPE = receiverTypeKey; }
+
+        String sender = call.getString("senderKey");
+        if (sender != null && !sender.isEmpty()) { KEY_SENDER = sender; }
+
+        String receiver = call.getString("receiverKey");
+        if (receiver != null && !receiver.isEmpty()) { KEY_RECEIVER = receiver; }
+
+        String tagKey = call.getString("tagKey");
+        if (tagKey != null && !tagKey.isEmpty()) { KEY_TAG = tagKey; }
+
+        JSObject result = new JSObject();
+        result.put("sessionKey", KEY_SESSION_ID);
+        result.put("senderKey", KEY_SENDER_NAME);
+        result.put("titleKey", KEY_TITLE);
+        result.put("bodyKey", KEY_BODY);
+        result.put("senderAvatarKey", KEY_SENDER_AVATAR);
+        result.put("receiverTypeKey", KEY_RECEIVER_TYPE);
+        result.put("senderKey", KEY_SENDER);
+        result.put("receiverKey", KEY_RECEIVER);
+        result.put("tagKey", KEY_TAG);
+
+        call.resolve(result);
+    }
+
+    /**
+     * Called when the plugin is loaded by Capacitor.
+     * Initializes Firebase, registers phone account, sets up notification channels, and connects bridge.
+     */
     @Override
     public void load() {
         Log.d(TAG, "Loading CapacitorPush plugin");
@@ -76,34 +145,47 @@ public class CapacitorPushPlugin extends Plugin {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 PhoneAccountUtils.registerPhoneAccount(getContext());
             }
-
-        // Get initial token after Firebase initialization
-//        getInitialToken();
     }
-//        following code provides the plugin instance to the app for launching from background and triggering listeners
+    // Singleton instance for plugin cross-callbacks
     private static CapacitorPushPlugin instance;
     public CapacitorPushPlugin() {
         instance = this;
     }
+    /**
+     * Dispatches event when a VoIP Call is accepted.
+     *
+     * @param sessionId The identifier for the call session.
+     * @param type The call type or category.
+     */
     public static void sendVoipCallAcceptedEvent(String sessionId, String type) {
         if (instance != null) {
             JSObject callAction = new JSObject();
-            callAction.put("sessionId", sessionId);
-            callAction.put("type", type);
+            callAction.put(KEY_SESSION_ID, sessionId);
+            callAction.put(KEY_TYPE, type);
             Log.d("TAG", "sendVoipCallAcceptedEvent: "+ type);
             instance.notifyListeners("voipCallAccepted", callAction, true); // true = deliver even if in background
         }
     }
 
+    /**
+     * Dispatches event when a VoIP Call is rejected.
+     *
+     * @param sessionId The identifier for the call session.
+     */
     public static void sendVoipCallDeclineEvent(String sessionId) {
         if (instance != null) {
             JSObject callAction = new JSObject();
-            callAction.put("sessionId", sessionId);
-            callAction.put("type", "voip");
+            callAction.put(KEY_SESSION_ID, sessionId);
+            callAction.put(KEY_TYPE, "voip");
             instance.notifyListeners("voipCallRejected", callAction, true); // true = deliver even if in background
         }
     }
-
+    /**
+     * Dispatches event when a push notification is clicked.
+     *
+     * @param id       Identifier linked to the notification (e.g. conversation ID).
+     * @param convType Type of conversation ("user" or "group").
+     */
     public static void sendNotificationClicked(String id, String convType){
         if (instance != null) {
             JSObject onTap = new JSObject();
@@ -112,6 +194,9 @@ public class CapacitorPushPlugin extends Plugin {
             instance.notifyListeners("pushNotificationActionPerformed", onTap, true); // true = deliver even if in background
         }
     }
+    /**
+     * Initializes Firebase if not already initialized.
+     */
     private void initializeFirebase() {
         try {
             if (FirebaseApp.getApps(getContext()).isEmpty()) {
@@ -124,7 +209,10 @@ public class CapacitorPushPlugin extends Plugin {
             Log.e(TAG, "Error initializing Firebase", e);
         }
     }
-
+    /**
+     * Optionally fetches the initial FCM registration token to send to the JS side.
+     * Invoked on UI thread.
+     */
     private void getInitialToken() {
         // Add a small delay to ensure Firebase is fully initialized
         getActivity().runOnUiThread(() -> {
@@ -155,8 +243,12 @@ public class CapacitorPushPlugin extends Plugin {
         });
     }
 
+    /**
+     * Creates required notification channels used for push and VoIP notifications (Android 13+).
+     */
+
     private void createNotificationChannels() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             NotificationManager notificationManager = getContext().getSystemService(NotificationManager.class);
 
             // Regular notifications channel
@@ -180,7 +272,11 @@ public class CapacitorPushPlugin extends Plugin {
             notificationManager.createNotificationChannel(voipChannel);
         }
     }
-
+    /**
+     * Echo test method, returns input string to verify communication.
+     *
+     * @param call The PluginCall from JS with "value" property.
+     */
     @PluginMethod
     public void echo(PluginCall call) {
         String value = call.getString("value");
@@ -189,10 +285,20 @@ public class CapacitorPushPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /**
+     * Returns singleton instance of this plugin.
+     *
+     * @return Current CapacitorPushPlugin instance.
+     */
     public static CapacitorPushPlugin getInstance() {
         return instance;
     }
 
+    /**
+     * Registers for push notifications and returns FCM token in callback.
+     *
+     * @param call The PluginCall from JS.
+     */
     @PluginMethod
     public void register(PluginCall call) {
         Log.d(TAG, "Register method called");
@@ -202,7 +308,7 @@ public class CapacitorPushPlugin extends Plugin {
                     .addOnCompleteListener(task -> {
                         if (!task.isSuccessful()) {
                             Log.w(TAG, "Fetching FCM registration token failed", task.getException());
-                            call.reject("Registration failed: " + task.getException().getMessage());
+                            call.reject("Registration failed: " + Objects.requireNonNull(task.getException()).getMessage());
                             return;
                         }
 
@@ -229,13 +335,21 @@ public class CapacitorPushPlugin extends Plugin {
             call.reject("Exception: " + e.getMessage());
         }
     }
-
+    /**
+     * Flushes any pending notifications (stub method).
+     *
+     * @param call The PluginCall from JS.
+     */
     @PluginMethod
     public void flushPending(PluginCall call) {
         // Implementation for flushing pending notifications
         call.resolve();
     }
-
+    /**
+     * Retrieves the current FCM token.
+     *
+     * @param call The PluginCall from JS.
+     */
     @PluginMethod
     public void getToken(PluginCall call) {
         try {
@@ -268,7 +382,11 @@ public class CapacitorPushPlugin extends Plugin {
             call.reject("Exception: " + e.getMessage());
         }
     }
-
+    /**
+     * Simulated method to get VoIP token on Android.
+     *
+     * @param call The PluginCall from JS.
+     */
     @PluginMethod
     public void getVoIPToken(PluginCall call) {
         // VoIP token simulation for Android
@@ -277,6 +395,11 @@ public class CapacitorPushPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /**
+     * Enable or disable VoIP functionality.
+     *
+     * @param call The PluginCall from JS. Accepts boolean "enable".
+     */
     @PluginMethod
     public void enableVoIP(PluginCall call) {
         Boolean enable = call.getBoolean("enable", true);
@@ -284,6 +407,11 @@ public class CapacitorPushPlugin extends Plugin {
         call.resolve();
     }
 
+    /**
+     * Sets the badge count on app icon (Android requires additional libs).
+     *
+     * @param call The PluginCall from JS with "count" integer param.
+     */
     @PluginMethod
     public void setBadgeCount(PluginCall call) {
         Integer count = call.getInt("count", 0);
@@ -292,6 +420,12 @@ public class CapacitorPushPlugin extends Plugin {
         call.resolve();
     }
 
+    /**
+     * Requests permission for notifications, phone, camera, and mic on Android 13+.
+     * Resolves granted immediately on older versions.
+     *
+     * @param call The PluginCall from JS.
+     */
     @PluginMethod
     public void requestPermissions(PluginCall call) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -304,7 +438,11 @@ public class CapacitorPushPlugin extends Plugin {
             call.resolve(ret);
         }
     }
-
+    /**
+     * Checks permission states for notifications.
+     *
+     * @param call The PluginCall from JS.
+     */
     @PluginMethod
     public void checkPermissions(PluginCall call) {
         JSObject ret = new JSObject();
@@ -318,7 +456,11 @@ public class CapacitorPushPlugin extends Plugin {
 
         call.resolve(ret);
     }
-
+    /**
+     * Test method to verify VoIP setup availability in JS bridge.
+     *
+     * @param call The PluginCall from JS.
+     */
     @PluginMethod
     public void testVoIPSetup(PluginCall call) {
         JSObject ret = new JSObject();
@@ -328,6 +470,11 @@ public class CapacitorPushPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /**
+     * Permission callback handler after user responds to permission request.
+     *
+     * @param call The PluginCall waiting on the permission result.
+     */
     @PermissionCallback
     private void permissionCallback(PluginCall call) {
         JSObject ret = new JSObject();
@@ -341,10 +488,11 @@ public class CapacitorPushPlugin extends Plugin {
 
         call.resolve(ret);
     }
-
-    // Method to handle VoIP call actions
-
-    // PUBLIC METHOD FOR TOKEN REFRESH
+    /**
+     * Handles token refresh event and notifies JS listeners.
+     *
+     * @param tokenData JSObject containing new token information.
+     */
     public void handleTokenRefresh(JSObject tokenData) {
         Log.d(TAG, "Token refreshed: " + tokenData.toString());
         notifyListeners("registration", tokenData);

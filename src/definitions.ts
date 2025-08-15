@@ -49,6 +49,29 @@ export interface CapacitorPushPlugin {
     voipToken: string;
   }>;
 
+    /**
+   * Set custom payload key mappings for flexible payload parsing
+   */
+ setKeyMappings(options: {
+    sessionKey?: string;
+    senderKey?: string;
+    titleKey?: string;
+    bodyKey?: string;
+    senderAvatarKey?: string;
+    receiverTypeKey?: string;
+    receiverKey?: string;
+    tagKey?: string;
+  }): Promise<{
+    sessionKey: string;
+    senderKey: string;
+    titleKey: string;
+    bodyKey: string;
+    senderAvatarKey: string;
+    receiverTypeKey: string;
+    receiverKey: string;
+    tagKey: string;
+  }>;
+
   /**
    * Add listeners for various notification events
    */

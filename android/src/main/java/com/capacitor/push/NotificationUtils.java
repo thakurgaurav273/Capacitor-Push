@@ -1,7 +1,20 @@
 package com.capacitor.push;
 
+// Static imports for payload keys
+import static com.capacitor.push.CapacitorPushPlugin.EVENT_NOTIFICATION_CLICKED;
+import static com.capacitor.push.CapacitorPushPlugin.KEY_BODY;
+import static com.capacitor.push.CapacitorPushPlugin.KEY_CALL_ACTION;
+import static com.capacitor.push.CapacitorPushPlugin.KEY_CALL_TYPE;
+import static com.capacitor.push.CapacitorPushPlugin.KEY_RECEIVER;
+import static com.capacitor.push.CapacitorPushPlugin.KEY_RECEIVER_TYPE;
+import static com.capacitor.push.CapacitorPushPlugin.KEY_SENDER;
+import static com.capacitor.push.CapacitorPushPlugin.KEY_SENDER_AVATAR;
+import static com.capacitor.push.CapacitorPushPlugin.KEY_SENDER_NAME;
+import static com.capacitor.push.CapacitorPushPlugin.KEY_SESSION_ID;
+import static com.capacitor.push.CapacitorPushPlugin.KEY_TAG;
+import static com.capacitor.push.CapacitorPushPlugin.KEY_TITLE;
+
 import android.Manifest;
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -19,55 +32,57 @@ import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
 import android.text.TextUtils;
 import android.util.Log;
-
 import androidx.annotation.RequiresPermission;
 import androidx.core.app.NotificationCompat;
-
-import com.getcapacitor.JSObject;
 import com.google.firebase.messaging.RemoteMessage;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Collections;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 
+/**
+ * Utility class for creating and displaying push notification UIs,
+ * including handling incoming VOIP calls and regular message notifications.
+ */
 public class NotificationUtils {
 
-    public static final String CHANNEL_VOIP = "voip_calls";
     public static final String CHANNEL_MESSAGES = "messages_channel";
-
-    // Avatar in-memory cache
-    public static final Map<String, Bitmap> avatarMap =
-            Collections.synchronizedMap(new HashMap<>());
-
-    public static void putAvatar(String sessionId, Bitmap bmp) {
-        avatarMap.put(sessionId, bmp);
+    /**
+     * Download a Bitmap image from a URL.
+     *
+     * @param src The image URL.
+     * @return Bitmap, or null on error.
+     */
+    public static Bitmap getBitmapFromURL(String src) {
+        try {
+            URL url = new URL(src);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setDoInput(true);
+            connection.connect();
+            InputStream input = connection.getInputStream();
+            Bitmap bitmap = BitmapFactory.decodeStream(input);
+            input.close();
+            connection.disconnect();
+            return bitmap;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
     }
-
-    public static Bitmap getAvatar(String sessionId) {
-        return avatarMap.get(sessionId);
-    }
-
-    public static void removeAvatar(String sessionId) {
-        avatarMap.remove(sessionId);
-    }
-
-    // Download and cache avatar before showing the call UI
-    public static void preloadAvatarAsync(Context context, String sessionId, String avatarUrl) {
-        new Thread(() -> {
-            Bitmap avatar = getBitmapFromURL(avatarUrl);
-            if (avatar != null) {
-                putAvatar(sessionId, avatar);
-                Log.d("NotificationUtils", "preloadAvatarAsync: " + avatar);
-            }
-        }).start();
-    }
-
-    public static void showNativeAndroidCallScreen(Context context, String senderName, String sessionId, String callType){
+    /**
+     * Show a native Android telecom call screen using TelecomManager.
+     * Ensures phone account is enabled and call subject/number are registered in call logs.
+     *
+     * @param context   Context to use for Telecom APIs.
+     * @param senderName Display name for caller.
+     * @param sessionId Unique session ID for the call.
+     * @param callType  Call type (audio/video).
+     */
+    public static void showNativeAndroidCallScreen(Context context, String senderName, String sessionId, String callType) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 PhoneAccountUtils.registerPhoneAccount(context);
@@ -76,68 +91,105 @@ public class NotificationUtils {
                 extras.putString("sessionId", sessionId);
                 extras.putString("callType", callType);
 
-                Uri callerUri = Uri.fromParts(PhoneAccount.SCHEME_SIP, senderName, null);
+                // Format phone number for call logs; fallback to synthetic number if needed
+                String phoneNumber = extractPhoneNumberFromName(senderName);
+                if (phoneNumber == null || phoneNumber.isEmpty()) {
+                    int hash = Math.abs(senderName != null ? senderName.hashCode() : sessionId.hashCode());
+                    phoneNumber = "+1" + String.format("%010d", hash);
+                }
+
+                Uri callerUri = Uri.fromParts(PhoneAccount.SCHEME_TEL, phoneNumber, null);
                 extras.putParcelable(TelecomManager.EXTRA_INCOMING_CALL_ADDRESS, callerUri);
+
+                // Set display name in call logs and telecom UI
+                extras.putString(TelecomManager.EXTRA_CALL_SUBJECT, senderName);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    extras.putString("android.telecom.extra.CALLER_DISPLAY_NAME", senderName);
+                }
 
                 TelecomManager telecomManager = (TelecomManager) context.getSystemService(Context.TELECOM_SERVICE);
                 PhoneAccountHandle handle = PhoneAccountUtils.getPhoneAccountHandle(context);
 
+                // Check if phone account enabled for incoming calls
                 boolean enabled = false;
-                for (PhoneAccountHandle h : telecomManager.getCallCapablePhoneAccounts()) {
-                    if (PhoneAccountUtils.PHONE_ACCOUNT_ID.equals(h.getId())) {
-                        enabled = true;
-                        break;
+                try {
+                    List<PhoneAccountHandle> accounts = telecomManager.getCallCapablePhoneAccounts();
+                    for (PhoneAccountHandle h : accounts) {
+                        if (PhoneAccountUtils.PHONE_ACCOUNT_ID.equals(h.getId())) {
+                            enabled = true;
+                            break;
+                        }
                     }
+                } catch (Exception e) {
+                    Log.e("TAG", "Error checking phone accounts", e);
                 }
-
+                // Prompt user to enable phone account if needed
                 if (!enabled) {
+                    Log.w("TAG", "Phone account not enabled, opening settings");
                     Intent intent = new Intent(TelecomManager.ACTION_CHANGE_PHONE_ACCOUNTS);
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     context.startActivity(intent);
+                    return;
                 }
-
+                // Check if incoming calls are permitted on this account
                 boolean permitted = true;
                 try {
                     permitted = telecomManager.isIncomingCallPermitted(handle);
-                } catch (Exception ignored) {}
-
-                if (enabled && permitted) {
-                    telecomManager.addNewIncomingCall(handle, extras);
-                    return;
+                } catch (Exception e) {
+                    Log.e("TAG", "Error checking call permission", e);
                 }
-            }}
-        catch (SecurityException ignored) {
-            // Fallback to custom notification
+                // Trigger incoming call screen if permitted
+                if (enabled && permitted) {
+                    Log.d("TAG", "Adding incoming call for: " + senderName + " with number: " + phoneNumber);
+                    telecomManager.addNewIncomingCall(handle, extras);
+                } else {
+                    Log.w("TAG", "Call not permitted - enabled: " + enabled + ", permitted: " + permitted);
+                }
+            }
+        } catch (SecurityException e) {
+            Log.e("TAG", "Security exception showing call screen", e);
+        } catch (Exception e) {
+            Log.e("TAG", "Error showing native call screen", e);
         }
     }
+    /**
+     * Helper method to extract a phone number from the sender name if present.
+     *
+     * @param senderName The sender's display name.
+     * @return Formatted phone number string or null.
+     */
+    private static String extractPhoneNumberFromName(String senderName) {
+        if (senderName == null) return null;
+
+        // Extract phone number if present in name
+        String phoneNumber = senderName.replaceAll("[^0-9+]", "");
+
+        // Use only if number seems valid (at least 7 digits)
+        if (phoneNumber.length() >= 7) {
+            return phoneNumber.startsWith("+") ? phoneNumber : "+" + phoneNumber;
+        }
+
+        return null;
+    }
+    /**
+     * Show incoming call UI when receiving a call payload via RemoteMessage.
+     * Cancels notification and ends call if call has ended or was rejected/accepted.
+     *
+     * @param context      Context for UI and system services.
+     * @param remoteMessage Payload with call details.
+     */
     @RequiresPermission(Manifest.permission.READ_PHONE_STATE)
     public static void showIncomingCallUI(Context context, RemoteMessage remoteMessage) {
         Map<String, String> dataMap = remoteMessage.getData();
-        String sessionId = dataMap.get("sessionId");
-        String senderName = dataMap.get("senderName");
-        String callType = dataMap.get("callType");
-        String senderAvatar = dataMap.get("senderAvatar");
-        String callAction = dataMap.get("callAction");
+        String sessionId = dataMap.get(KEY_SESSION_ID);
+        String senderName = dataMap.get(KEY_SENDER_NAME);
+        String callType = dataMap.get(KEY_CALL_TYPE);
+        String senderAvatar = dataMap.get(KEY_SENDER_AVATAR);
+        String callAction = dataMap.get(KEY_CALL_ACTION);
 
         if (sessionId == null || senderName == null) return;
 
-        // Preload avatar asynchronously
-        if (!TextUtils.isEmpty(senderAvatar)) {
-            preloadAvatarAsync(context, sessionId, senderAvatar);
-        }
-
-        // Handle call cancellation broadcast
-        if ("cancelled".equalsIgnoreCase(callAction)) {
-            Intent finishIntent = new Intent("com.capacitor.push.ACTION_CALL_CANCELLED");
-            finishIntent.putExtra("sessionId", sessionId);
-            try {
-                context.sendBroadcast(finishIntent);
-            } catch (NoClassDefFoundError e) {
-                context.sendBroadcast(finishIntent);
-            }
-        }
-
-        // Cancel notification & end ongoing call if needed
+        // Cancel notification & end the call for terminal states
         if ("cancelled".equalsIgnoreCase(callAction) ||
                 "rejected".equalsIgnoreCase(callAction) ||
                 "accepted".equalsIgnoreCase(callAction) ||
@@ -153,32 +205,39 @@ public class NotificationUtils {
             }
             return;
         }
+        // Show the native call screen if compatible
 
-        // Native Android Call UI for API 33+ (Android 13)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            showNativeAndroidCallScreen(context, senderName,sessionId, callType);
+            Log.d("TAG", "Showing native call screen for: " + senderName);
+            showNativeAndroidCallScreen(context, senderName, sessionId, callType);
         }
+
     }
-
-    public static void showFallbackNotification(Context context, RemoteMessage remoteMessage) {
+    /**
+     * Show a standard message notification (not a call) for message payloads.
+     * Handles avatar loading, click intents, and notification channel registration.
+     *
+     * @param context       Context for notification services.
+     * @param remoteMessage Payload with message details.
+     */
+    public static void showTextNotificationUI(Context context, RemoteMessage remoteMessage) {
         Map<String, String> dataMap = remoteMessage.getData();
-        String title = dataMap.get("title");
-        String body = dataMap.get("body");
-        String senderAvatar = dataMap.get("senderAvatar");
-
-        String receiverType = dataMap.get("receiverType");
-        String sender = dataMap.get("sender");
-        String receiver = dataMap.get("receiver");
+        String title = dataMap.get(KEY_TITLE);
+        String body = dataMap.get(KEY_BODY);
+        String senderAvatar = dataMap.get(KEY_SENDER_AVATAR);
+        String receiverType = dataMap.get(KEY_RECEIVER_TYPE);
+        String sender = dataMap.get(KEY_SENDER);
+        String receiver = dataMap.get(KEY_RECEIVER);
 
         createMessageChannel(context);
-
+        // Prepare intent for click/tap handling
         Intent tapIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         assert tapIntent != null;
-
+        // Identify conversation type and ID
         String id = "user".equalsIgnoreCase(receiverType) ? sender : receiver;
         String convType = "user".equalsIgnoreCase(receiverType) ? "user" : "group";
 
-        tapIntent.setAction("com.capacitor.push.NOTIFICATION_TAPPED");
+        tapIntent.setAction(EVENT_NOTIFICATION_CLICKED);
         tapIntent.putExtra("id", id);
         tapIntent.putExtra("convType", convType);
         tapIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -186,11 +245,11 @@ public class NotificationUtils {
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 context, 0, tapIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
-
+        // Build notification UI, set avatar if available
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_MESSAGES)
                 .setContentTitle(title != null ? title : "New Message")
                 .setContentText(body != null ? body : "")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.ic_whatsapp_small)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent);
@@ -201,55 +260,27 @@ public class NotificationUtils {
                 builder.setLargeIcon(avatar);
             }
         } else {
-            builder.setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.ic_phone));
+            builder.setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.ic_person));
         }
-
+        // Show notification
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager != null) {
             int msgId;
             try {
-                msgId = Integer.parseInt(dataMap.get("tag"));
+                msgId = Integer.parseInt(Objects.requireNonNull(dataMap.get(KEY_TAG)));
             } catch (Exception e) {
                 msgId = new Random().nextInt();
             }
             manager.notify(msgId, builder.build());
         }
     }
-
-    private static void recreateVoipChannel(Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationManager manager = context.getSystemService(NotificationManager.class);
-            if (manager != null) {
-                manager.deleteNotificationChannel(CHANNEL_VOIP);
-                NotificationChannel channel = new NotificationChannel(
-                        CHANNEL_VOIP, "VoIP Calls", NotificationManager.IMPORTANCE_HIGH
-                );
-                channel.setDescription("Used for incoming call notifications");
-                channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-                channel.setBypassDnd(true);
-                channel.setShowBadge(false);
-                channel.enableVibration(true);
-                channel.setVibrationPattern(new long[]{0, 1000, 1000, 1000});
-
-                Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-                if (soundUri == null) {
-                    soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-                }
-
-                AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build();
-                channel.setSound(soundUri, audioAttributes);
-
-                manager.createNotificationChannel(channel);
-                Log.d("NotificationUtils", "VoIP channel recreated with sound: " + soundUri);
-            }
-        }
-    }
-
+    /**
+     * Register a notification channel for message notifications on Android 13+.
+     *
+     * @param context The app context.
+     */
     private static void createMessageChannel(Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             NotificationManager manager = context.getSystemService(NotificationManager.class);
             if (manager != null && manager.getNotificationChannel(CHANNEL_MESSAGES) == null) {
                 NotificationChannel channel = new NotificationChannel(
@@ -267,21 +298,6 @@ public class NotificationUtils {
                 channel.setVibrationPattern(new long[]{0, 250, 250, 250});
                 manager.createNotificationChannel(channel);
             }
-        }
-    }
-
-    public static Bitmap getBitmapFromURL(String strURL) {
-        try {
-            if (strURL == null) return null;
-            URL url = new URL(strURL);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setDoInput(true);
-            connection.connect();
-            InputStream input = connection.getInputStream();
-            return BitmapFactory.decodeStream(input);
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
         }
     }
 }
