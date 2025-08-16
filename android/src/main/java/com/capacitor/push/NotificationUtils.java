@@ -13,6 +13,7 @@ import static com.capacitor.push.CapacitorPushPlugin.KEY_SENDER_NAME;
 import static com.capacitor.push.CapacitorPushPlugin.KEY_SESSION_ID;
 import static com.capacitor.push.CapacitorPushPlugin.KEY_TAG;
 import static com.capacitor.push.CapacitorPushPlugin.KEY_TITLE;
+import static com.capacitor.push.CapacitorPushPlugin.sendPushNotificationReceivedEvent;
 
 import android.Manifest;
 import android.app.NotificationChannel;
@@ -34,6 +35,8 @@ import android.text.TextUtils;
 import android.util.Log;
 import androidx.annotation.RequiresPermission;
 import androidx.core.app.NotificationCompat;
+
+import com.getcapacitor.JSObject;
 import com.google.firebase.messaging.RemoteMessage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -223,6 +226,7 @@ public class NotificationUtils {
     public static void showTextNotificationUI(Context context, RemoteMessage remoteMessage) {
         Map<String, String> dataMap = remoteMessage.getData();
         String title = dataMap.get(KEY_TITLE);
+        String msgID = dataMap.get(KEY_TAG);
         String body = dataMap.get(KEY_BODY);
         String senderAvatar = dataMap.get(KEY_SENDER_AVATAR);
         String receiverType = dataMap.get(KEY_RECEIVER_TYPE);
