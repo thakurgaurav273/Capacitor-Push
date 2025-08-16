@@ -6,7 +6,7 @@ import CallKit
 import AVFAudio
 
 @objc(CapacitorPushPlugin)
-public class CapacitorPushPlugin: CAPPlugin, PKPushRegistryDelegate, CXProviderDelegate {
+public class CapacitorPushPlugin: CAPPlugin, PKPushRegistryDelegate, CXProviderDelegate, UNUserNotificationCenterDelegate {
     private var pushRegistry: PKPushRegistry?
     private var voipToken: String?
     private var apnsToken: String?
@@ -28,6 +28,12 @@ public class CapacitorPushPlugin: CAPPlugin, PKPushRegistryDelegate, CXProviderD
         setupNotificationObservers()
         setupVoIPPushRegistry()
         setupCallKit()
+        setupUserNotifications()
+    }
+    
+    private func setupUserNotifications() {
+        print("🔧 Setting up User Notifications...")
+        UNUserNotificationCenter.current().delegate = self
     }
     
     private func setupAppReadinessObservers() {
@@ -168,6 +174,29 @@ public class CapacitorPushPlugin: CAPPlugin, PKPushRegistryDelegate, CXProviderD
             name: .init("CapacitorPushPluginDidFail"),
             object: nil
         )
+        
+        // Add observer for push notification received
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(didReceiveRemoteNotification(_:)),
+            name: .init("CapacitorPushPluginDidReceive"),
+            object: nil
+        )
+    }
+    
+    @objc private func didReceiveRemoteNotification(_ notification: Notification) {
+        guard let userInfo = notification.userInfo?["userInfo"] as? [String: Any] else {
+            print("❌ Push: No userInfo in notification")
+            return
+        }
+        
+        print("📦 Push notification received: \(userInfo)")
+        
+        // Trigger pushNotificationReceived event
+        notifyListeners("pushNotificationReceived", data: [
+            "data": userInfo,
+            "id": userInfo["id"] as? String ?? UUID().uuidString
+        ])
     }
     
     private func setupVoIPPushRegistry() {
@@ -186,7 +215,7 @@ public class CapacitorPushPlugin: CAPPlugin, PKPushRegistryDelegate, CXProviderD
     
     private func setupCallKit() {
         print("🔧 Setting up CallKit...")
-        let config = CXProviderConfiguration(localizedName: "MyApp")
+        let config: CXProviderConfiguration =  CXProviderConfiguration();
         config.supportsVideo = true
         config.maximumCallsPerCallGroup = 1
         config.supportedHandleTypes = [.generic]
@@ -383,6 +412,61 @@ public class CapacitorPushPlugin: CAPPlugin, PKPushRegistryDelegate, CXProviderD
         }
     }
     
+    // MARK: - UNUserNotificationCenterDelegate
+    
+    // Called when notification is received while app is in foreground
+    public func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                     willPresent notification: UNNotification,
+                                     withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        
+        print("📦 Push notification received in foreground: \(notification.request.content.userInfo)")
+        
+        // Trigger pushNotificationReceived event
+        notifyListeners("pushNotificationReceived", data: [
+            "data": notification.request.content.userInfo,
+            "id": notification.request.identifier,
+            "title": notification.request.content.title,
+            "body": notification.request.content.body
+        ])
+        
+        // Show the notification even when app is in foreground
+        completionHandler([.alert, .badge, .sound])
+    }
+    
+    // Called when user taps on notification
+    public func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                     didReceive response: UNNotificationResponse,
+                                     withCompletionHandler completionHandler: @escaping () -> Void) {
+        
+        print("📱 Push notification tapped: \(response.notification.request.content.userInfo)")
+        print("📱 Action identifier: \(response.actionIdentifier)")
+        
+        let notification = response.notification
+        var actionData: [String: Any] = [
+            "actionId": response.actionIdentifier,
+            "inputValue": "",
+            "notification": [
+                "id": notification.request.identifier,
+                "title": notification.request.content.title,
+                "body": notification.request.content.body,
+                "data": notification.request.content.userInfo,
+                "tag": notification.request.content.userInfo["tag"] as? String ?? "",
+                "badge": notification.request.content.badge?.intValue ?? 0
+            ]
+        ]
+        
+        // Handle text input response if available
+        if let textResponse = response as? UNTextInputNotificationResponse {
+            actionData["inputValue"] = textResponse.userText
+            print("📱 Text input received: \(textResponse.userText)")
+        }
+        
+        // Trigger pushNotificationActionPerformed event
+        notifyListeners("pushNotificationActionPerformed", data: actionData)
+        
+        completionHandler()
+    }
+    
     // MARK: - PKPushRegistryDelegate
     public func pushRegistry(_ registry: PKPushRegistry, didUpdate pushCredentials: PKPushCredentials, for type: PKPushType) {
         print("📱 Push Registry - didUpdate called for type: \(type)")
@@ -537,6 +621,7 @@ public class CapacitorPushPlugin: CAPPlugin, PKPushRegistryDelegate, CXProviderD
         print("📞 CallKit: Provider reset.")
         activeCalls.removeAll()
     }
+    
     
     public func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
         print("📞 CallKit: Answer Call - \(String(describing: self.sessionID))")
