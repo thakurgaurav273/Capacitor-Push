@@ -188,6 +188,26 @@ public class CapacitorPushPlugin extends Plugin {
             instance.notifyListeners("voipCallRejected", callAction, true); // true = deliver even if in background
         }
     }
+
+    /**
+     * Dispatches event when a notification is received.
+     *
+     * @param id The identifier for the message.
+     * @param title The identifier for the message.
+     * @param body The identifier for the message.
+     * @param data The identifier for the message.
+
+     */
+    public static void sendPushNotificationReceivedEvent(String id, String title, String body, JSObject data) {
+        if (instance != null) {
+            JSObject notification = new JSObject();
+            notification.put("id", id);
+            notification.put("title", title);
+            notification.put("body", body);
+            notification.put("data", data);
+            instance.notifyListeners("pushNotificationReceived", notification, true);
+        }
+    }
     /**
      * Dispatches event when a push notification is clicked.
      *

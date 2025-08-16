@@ -229,6 +229,14 @@ public class NotificationUtils {
         String sender = dataMap.get(KEY_SENDER);
         String receiver = dataMap.get(KEY_RECEIVER);
 
+        JSObject data = new JSObject();
+        for (Map.Entry<String, String> entry : remoteMessage.getData().entrySet()) {
+            data.put(entry.getKey(), entry.getValue());
+        }
+        // send the pushnotification received event... 
+
+        sendPushNotificationReceivedEvent(msgID, title, body, data);
+
         createMessageChannel(context);
         // Prepare intent for click/tap handling
         Intent tapIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
