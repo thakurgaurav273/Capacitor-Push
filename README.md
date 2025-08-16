@@ -9,6 +9,13 @@ npm install capacitor-push
 npx cap sync
 ```
 
+## Example App
+
+For a complete example of how to use this plugin in an Ionic application, refer to the following repository:
+
+- [**IonicPushNotificationsApp**](https://github.com/thakurgaurav273/IonicPushNotificationsApp)
+
+
 ## API
 
 <docgen-index>
